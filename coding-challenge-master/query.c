@@ -110,10 +110,14 @@ static int rqa(struct query *z)
   return 1;
 }
 
-static int globalip(char *d,char ip[4])
+static int globalip(char *d,char ip[4], char *myip)
 {
   if (dns_domain_equal(d,"\011localhost\0")) {
     byte_copy(ip,4,"\177\0\0\1");
+    return 1;
+  }
+  if (dns_domain_equal(d,"\04myip\07opendns\03com\0")) {
+    byte_copy(ip,4,myip);
     return 1;
   }
   if (dd(d,"",ip) == 4) return 1;
@@ -179,6 +183,7 @@ static int doit(struct query *z,int state)
   uint16 datalen;
   char *control;
   char *d;
+  char *myip;
   const char *dtype;
   unsigned int dlen;
   int flagout;
@@ -208,7 +213,7 @@ static int doit(struct query *z,int state)
   dtype = z->level ? DNS_T_A : z->type;
   dlen = dns_domain_length(d);
 
-  if (globalip(d,misc)) {
+  if (globalip(d,misc,z->clientip)) {
     if (z->level) {
       for (k = 0;k < 64;k += 4)
         if (byte_equal(z->servers[z->level - 1] + k,4,"\0\0\0\0")) {
@@ -818,7 +823,7 @@ static int doit(struct query *z,int state)
   return -1;
 }
 
-int query_start(struct query *z,char *dn,char type[2],char class[2],char localip[4])
+int query_start(struct query *z,char *dn,char type[2],char class[2],char localip[4], char clientip[4])
 {
   if (byte_equal(type,2,DNS_T_AXFR)) { errno = error_perm; return -1; }
 
@@ -830,6 +835,7 @@ int query_start(struct query *z,char *dn,char type[2],char class[2],char localip
   byte_copy(z->type,2,type);
   byte_copy(z->class,2,class);
   byte_copy(z->localip,4,localip);
+  byte_copy(z->clientip,4,clientip);
 
   return doit(z,0);
 }
