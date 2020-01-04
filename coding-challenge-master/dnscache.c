@@ -22,6 +22,7 @@
 #include "log.h"
 #include "okclient.h"
 #include "droproot.h"
+#include "stdio.h"
 
 static int packetquery(char *buf,unsigned int len,char **q,char qtype[2],char qclass[2],char id[2])
 {
@@ -92,6 +93,13 @@ void u_new(void)
   static char *q = 0;
   char qtype[2];
   char qclass[2];
+  char ip_cache_key[4];
+  unsigned int keylen = 4;
+  unsigned int cachedlen = 4;
+  char cached_result[cachedlen];
+  int ip_access_check_result;
+  char* cached;
+  uint32 ttl = 604800;
 
   for (j = 0;j < MAXUDP;++j)
     if (!u[j].active)
@@ -113,7 +121,19 @@ void u_new(void)
   if (len == -1) return;
   if (len >= sizeof buf) return;
   if (x->port < 1024) if (x->port != 53) return;
-  if (!okclient(x->ip)) return;
+
+  byte_copy(ip_cache_key,4,x->ip);
+  cached = cache_get(ip_cache_key, 4, &cachedlen, &ttl);
+  if (cached) {
+    sscanf(cached, "%d", &ip_access_check_result);
+  } else {
+    ip_access_check_result = okclient(ip_cache_key);
+    sprintf(cached_result, "%d", ip_access_check_result);
+    cache_set(ip_cache_key,4,cached_result,4,ttl);
+  }
+  if (!ip_access_check_result) {
+    return;
+  }
 
   if (!packetquery(buf,len,&q,qtype,qclass,x->id)) return;
 
